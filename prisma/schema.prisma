@@ -1,0 +1,154 @@
+// Prisma Schema for SmartMunshi - 5 Year Architecture & High Performance Indexing
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Site {
+  id          String       @id @default(uuid())
+  name        String
+  location    String
+  budget      Float        @default(0.0)
+  status      String       @default("ACTIVE") // ACTIVE, COMPLETED, PAUSED
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  attendances Attendance[]
+  advances    Advance[]
+  expenses    Expense[]
+  wagePayouts WagePayout[]
+}
+
+model Labour {
+  id           String        @id @default(uuid())
+  name         String
+  phone        String        @unique
+  pin          String        @default("1234") // Secure 4-digit login PIN
+  skill        String        // MASON, HELPER, PAINTER, CARPENTER, ELECTRICIAN, PLUMBER, WELDER, SUPERVISOR
+  dailyWage    Float         @default(600.0)
+  status       String        @default("ACTIVE") // ACTIVE, ON_LEAVE, ARCHIVED
+  joiningDate  DateTime      @default(now())
+  
+  // Financial & Bank / UPI Info
+  bankName     String?
+  accountNo    String?
+  ifsc         String?
+  upiId        String?
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  attendances  Attendance[]
+  advances     Advance[]
+  wagePayouts  WagePayout[]
+
+  @@index([status])
+  @@index([skill])
+}
+
+model Attendance {
+  id              String   @id @default(uuid())
+  labourId        String
+  labour          Labour   @relation(fields: [labourId], references: [id], onDelete: Cascade)
+  siteId          String?
+  site            Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  
+  date            String   // YYYY-MM-DD for fast index lookup
+  status          String   // PRESENT, HALF_DAY, ABSENT
+  overtimeHours   Float    @default(0.0)
+  calculatedWage  Float    @default(0.0)
+  
+  selfMarked      Boolean  @default(false)
+  verifiedByAdmin Boolean  @default(true)
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([labourId, date])
+  @@index([date])
+  @@index([labourId, date])
+  @@index([siteId])
+}
+
+model Advance {
+  id          String   @id @default(uuid())
+  labourId    String
+  labour      Labour   @relation(fields: [labourId], references: [id], onDelete: Cascade)
+  siteId      String?
+  site        Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  
+  date        String   // YYYY-MM-DD
+  amount      Float
+  paymentMode String   @default("CASH") // CASH, UPI, BANK_TRANSFER
+  reason      String   // Mandatory reason (e.g. Emergency, Home Trip, Festival)
+  status      String   @default("PAID") // PENDING, PAID, DEDUCTED
+  approvedBy  String   @default("Admin Munshi")
+  
+  createdAt   DateTime @default(now())
+
+  @@index([labourId, date])
+  @@index([date])
+  @@index([status])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  siteId      String?
+  site        Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  
+  category    String   // MATERIALS, TRANSPORT, FOOD_SNACKS, TOOLS, FUEL, MISC
+  amount      Float
+  date        String   // YYYY-MM-DD
+  paidBy      String   @default("Admin / Site Manager")
+  description String
+  receiptUrl  String?
+  vendorName  String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([siteId, date])
+  @@index([category])
+  @@index([date])
+}
+
+model WagePayout {
+  id             String   @id @default(uuid())
+  labourId       String
+  labour         Labour   @relation(fields: [labourId], references: [id], onDelete: Cascade)
+  siteId         String?
+  site           Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  
+  date           String   // YYYY-MM-DD settlement date
+  amountPaid     Float
+  advancesDeducted Float  @default(0.0)
+  totalEarned    Float
+  netPayable     Float
+  
+  paymentMode    String   @default("UPI") // CASH, UPI, BANK_TRANSFER
+  transactionRef String?
+  notes          String?
+  
+  createdAt      DateTime @default(now())
+
+  @@index([labourId, date])
+  @@index([date])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // ATTENDANCE_OVERRIDE, EXPENSE_ADDED, ADVANCE_GIVEN, PAYOUT_SETTLED, PROFILE_UPDATED
+  entity     String   // Labour, Expense, Attendance, Advance, WagePayout
+  entityId   String?
+  details    String
+  performedBy String  @default("Admin Munshi")
+  timestamp  DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([entity])
+}

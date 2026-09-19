@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen selection:bg-sky-500 selection:text-white;
+  }
+}
+
+/* Custom Print Styles for PDF Wage Slip Vouchers */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-voucher, .printable-voucher * {
+    visibility: visible;
+  }
+  .printable-voucher {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
