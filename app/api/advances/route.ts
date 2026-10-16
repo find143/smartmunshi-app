@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validateAmount, validateText } from '@/lib/validation';
 
 export async function GET(request: Request) {
   try {
@@ -46,11 +47,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { labourId, siteId, amount, date, paymentMode, reason, approvedBy } = body;
 
-    if (!labourId || !amount || !reason) {
-      return NextResponse.json(
-        { error: 'Labour, Amount, and Mandatory Reason are required.' },
-        { status: 400 }
-      );
+    if (!labourId) {
+      return NextResponse.json({ error: 'Worker selection is required.' }, { status: 400 });
+    }
+
+    const amountCheck = validateAmount(amount, 1, 500000, 'Advance Amount');
+    if (!amountCheck.isValid) {
+      return NextResponse.json({ error: amountCheck.error }, { status: 400 });
+    }
+
+    const reasonCheck = validateText(reason, 'Mandatory Reason', 3, 200);
+    if (!reasonCheck.isValid) {
+      return NextResponse.json({ error: reasonCheck.error }, { status: 400 });
     }
 
     const newAdvance = await prisma.advance.create({
@@ -60,7 +68,7 @@ export async function POST(request: Request) {
         amount: parseFloat(amount),
         date: date || new Date().toISOString().split('T')[0],
         paymentMode: paymentMode || 'CASH',
-        reason,
+        reason: reason.trim(),
         approvedBy: approvedBy || 'Admin Munshi',
         status: 'PAID',
       },
@@ -73,7 +81,7 @@ export async function POST(request: Request) {
         action: 'ADVANCE_GIVEN',
         entity: 'Advance',
         entityId: newAdvance.id,
-        details: `Disbursed advance of ₹${amount} to ${newAdvance.labour.name} via ${paymentMode}. Reason: ${reason}`,
+        details: `Disbursed advance of ₹${amount} to ${newAdvance.labour.name} via ${paymentMode}. Reason: ${reason.trim()}`,
         performedBy: approvedBy || 'Admin Munshi',
       },
     });

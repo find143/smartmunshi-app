@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { 
+  validateName, 
+  validatePhone, 
+  validatePin, 
+  validateDailyWage, 
+  validateIfsc, 
+  validateAccountNo, 
+  validateUpiId 
+} from '@/lib/validation';
 
 export async function GET(request: Request) {
   try {
@@ -67,24 +76,64 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, phone, pin, skill, dailyWage, bankName, accountNo, ifsc, upiId } = body;
 
-    if (!name || !phone || !dailyWage) {
+    // Server side validations
+    const nameCheck = validateName(name);
+    if (!nameCheck.isValid) {
+      return NextResponse.json({ error: nameCheck.error }, { status: 400 });
+    }
+
+    const phoneCheck = validatePhone(phone);
+    if (!phoneCheck.isValid) {
+      return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
+    }
+
+    const pinCheck = validatePin(pin || '1234');
+    if (!pinCheck.isValid) {
+      return NextResponse.json({ error: pinCheck.error }, { status: 400 });
+    }
+
+    const wageCheck = validateDailyWage(dailyWage);
+    if (!wageCheck.isValid) {
+      return NextResponse.json({ error: wageCheck.error }, { status: 400 });
+    }
+
+    if (ifsc) {
+      const ifscCheck = validateIfsc(ifsc);
+      if (!ifscCheck.isValid) return NextResponse.json({ error: ifscCheck.error }, { status: 400 });
+    }
+
+    if (accountNo) {
+      const accCheck = validateAccountNo(accountNo);
+      if (!accCheck.isValid) return NextResponse.json({ error: accCheck.error }, { status: 400 });
+    }
+
+    if (upiId) {
+      const upiCheck = validateUpiId(upiId);
+      if (!upiCheck.isValid) return NextResponse.json({ error: upiCheck.error }, { status: 400 });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+
+    // Check duplicate phone number
+    const existing = await prisma.labour.findUnique({ where: { phone: cleanPhone } });
+    if (existing) {
       return NextResponse.json(
-        { error: 'Name, Phone Number and Daily Wage are required.' },
+        { error: `Worker with mobile number ${cleanPhone} is already registered.` },
         { status: 400 }
       );
     }
 
     const newLabour = await prisma.labour.create({
       data: {
-        name,
-        phone,
-        pin: pin || '1234',
+        name: name.trim(),
+        phone: cleanPhone,
+        pin: pin ? pin.trim() : '1234',
         skill: skill || 'HELPER',
         dailyWage: parseFloat(dailyWage),
-        bankName: bankName || null,
-        accountNo: accountNo || null,
-        ifsc: ifsc || null,
-        upiId: upiId || null,
+        bankName: bankName ? bankName.trim() : null,
+        accountNo: accountNo ? accountNo.trim() : null,
+        ifsc: ifsc ? ifsc.trim().toUpperCase() : null,
+        upiId: upiId ? upiId.trim() : null,
       },
     });
 
@@ -94,7 +143,7 @@ export async function POST(request: Request) {
         action: 'LABOUR_CREATED',
         entity: 'Labour',
         entityId: newLabour.id,
-        details: `Registered new labour ${name} (${skill}) with wage ₹${dailyWage}/day`,
+        details: `Registered new labour ${name.trim()} (${skill}) with wage ₹${dailyWage}/day`,
         performedBy: 'Admin Munshi',
       },
     });

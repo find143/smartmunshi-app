@@ -65,15 +65,31 @@ export const LabourPortal: React.FC<LabourPortalProps> = ({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = labours.find(
-      (l) => l.phone.includes(phoneNumber) && (l.pin === pin || pin === '1234')
-    );
+    const cleanInputPhone = phoneNumber.replace(/\D/g, '');
+    const cleanInputPin = pin.trim();
+
+    if (cleanInputPhone.length !== 10) {
+      setLoginError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (cleanInputPin.length !== 4) {
+      setLoginError('Please enter a valid 4-digit PIN.');
+      return;
+    }
+
+    const found = labours.find((l) => {
+      const dbPhone = l.phone.replace(/\D/g, '');
+      const phoneMatches = dbPhone === cleanInputPhone || dbPhone.endsWith(cleanInputPhone);
+      const pinMatches = l.pin === cleanInputPin || cleanInputPin === '1234';
+      return phoneMatches && pinMatches;
+    });
 
     if (found) {
       setLoggedInLabour(found);
       setLoginError('');
     } else {
-      setLoginError('Invalid Mobile Number or PIN. Try PIN 1234.');
+      setLoginError('Invalid Mobile Number or PIN. Contact Munshi if forgotten.');
     }
   };
 
@@ -191,10 +207,11 @@ export const LabourPortal: React.FC<LabourPortalProps> = ({
                 <input
                   type="text"
                   required
+                  maxLength={10}
                   placeholder="e.g. 9876543210"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-slate-950 text-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  className="w-full bg-slate-950 text-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                 />
               </div>
             </div>
@@ -209,8 +226,8 @@ export const LabourPortal: React.FC<LabourPortalProps> = ({
                   maxLength={4}
                   placeholder="Default PIN: 1234"
                   value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  className="w-full bg-slate-950 text-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  className="w-full bg-slate-950 text-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                 />
               </div>
             </div>

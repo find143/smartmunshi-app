@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validateAmount, validateText } from '@/lib/validation';
 
 export async function GET(request: Request) {
   try {
@@ -60,11 +61,18 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { siteId, category, amount, date, paidBy, description, receiptUrl, vendorName } = body;
 
-    if (!category || !amount || !description) {
-      return NextResponse.json(
-        { error: 'Category, Amount and Description are required.' },
-        { status: 400 }
-      );
+    if (!category) {
+      return NextResponse.json({ error: 'Expense Category is required.' }, { status: 400 });
+    }
+
+    const amountCheck = validateAmount(amount, 1, 10000000, 'Expense Amount');
+    if (!amountCheck.isValid) {
+      return NextResponse.json({ error: amountCheck.error }, { status: 400 });
+    }
+
+    const descCheck = validateText(description, 'Description / Reason', 3, 200);
+    if (!descCheck.isValid) {
+      return NextResponse.json({ error: descCheck.error }, { status: 400 });
     }
 
     const newExpense = await prisma.expense.create({
@@ -74,9 +82,9 @@ export async function POST(request: Request) {
         amount: parseFloat(amount),
         date: date || new Date().toISOString().split('T')[0],
         paidBy: paidBy || 'Admin / Site Manager',
-        description,
+        description: description.trim(),
         receiptUrl: receiptUrl || null,
-        vendorName: vendorName || null,
+        vendorName: vendorName ? vendorName.trim() : null,
       },
     });
 
@@ -86,7 +94,7 @@ export async function POST(request: Request) {
         action: 'EXPENSE_LOGGED',
         entity: 'Expense',
         entityId: newExpense.id,
-        details: `Logged ${category} expense of ₹${amount} for ${description}`,
+        details: `Logged ${category} expense of ₹${amount} for ${description.trim()}`,
         performedBy: paidBy || 'Admin Munshi',
       },
     });

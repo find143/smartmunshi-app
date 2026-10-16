@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validateAmount } from '@/lib/validation';
 
 export async function GET(request: Request) {
   try {
@@ -56,11 +57,13 @@ export async function POST(request: Request) {
       notes,
     } = body;
 
-    if (!labourId || !amountPaid) {
-      return NextResponse.json(
-        { error: 'Labour ID and Amount Paid are required.' },
-        { status: 400 }
-      );
+    if (!labourId) {
+      return NextResponse.json({ error: 'Worker selection is required.' }, { status: 400 });
+    }
+
+    const amountCheck = validateAmount(amountPaid, 1, 10000000, 'Amount Paid');
+    if (!amountCheck.isValid) {
+      return NextResponse.json({ error: amountCheck.error }, { status: 400 });
     }
 
     const payout = await prisma.wagePayout.create({
@@ -73,8 +76,8 @@ export async function POST(request: Request) {
         totalEarned: parseFloat(totalEarned || amountPaid),
         netPayable: parseFloat(netPayable || amountPaid),
         paymentMode,
-        transactionRef: transactionRef || null,
-        notes: notes || null,
+        transactionRef: transactionRef ? transactionRef.trim() : null,
+        notes: notes ? notes.trim() : null,
       },
       include: { labour: true },
     });
